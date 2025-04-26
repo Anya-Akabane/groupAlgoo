@@ -1,8 +1,11 @@
 package withcollection;
 
-import java.util.*;
+import data_structure.MyEntry;
+import data_structure.MyMap;
+import data_structure.MyList;
+import data_structure.MyStack;
 
-public class RMIT_Sudoku_Solvers {
+public class RMIT_Sudoku_Solvers{
     private int steps = 0;
     private long startTime;
 
@@ -21,20 +24,14 @@ public class RMIT_Sudoku_Solvers {
             Cell cell = (Cell) o;
             return row == cell.row && col == cell.col;
         }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(row, col);
-        }
     }
 
     public int[][] solve(int[][] puzzle) throws Exception {
         startTime = System.nanoTime();
 
-        // list of valid values each variable
-        Map<Cell, List<Integer>> domains = initializeDomains(puzzle);
+        MyMap<Cell, MyList<Integer>> domains = initializeDomains(puzzle);
 
-        if (!backtrack(puzzle, domains, new Stack<>())) {
+        if (!backtrack(puzzle, domains, new MyStack<>())) {
             throw new Exception("No solution found within constraints.");
         }
 
@@ -49,54 +46,43 @@ public class RMIT_Sudoku_Solvers {
         return puzzle;
     }
 
-    private boolean backtrack(int[][] board, Map<Cell, List<Integer>> domains, Stack<Map.Entry<Cell, Integer>> trail) {
-        //trail: history of moves made (cell, value)
-        
+    private boolean backtrack(int[][] board, MyMap<Cell, MyList<Integer>> domains, MyStack<MyEntry<Cell, Integer>> trail) {
         Cell cell = selectMRV(domains);
-        
-        if (cell == null) 
+
+        if (cell == null)
             return true; // Solved
 
-        List<Integer> values = orderLCV(board, cell, domains.get(cell));
+        MyList<Integer> values = orderLCV(board, cell, domains.get(cell));
 
-        for (int num : values) {
+        for (int i = 0; i < values.size(); i++) {
+            int num = values.get(i);
             if (isValid(board, cell.row, cell.col, num)) {
                 board[cell.row][cell.col] = num;
                 steps++;
 
+                MyMap<Cell, MyList<Integer>> backup = deepCopy(domains);
 
-                // Save the current domain map in case we need to undo this move
-                Map<Cell, List<Integer>> backup = deepCopy(domains);
-
-
-                // removes num from the domains of all affected cells (same row, col, box)
                 if (forwardCheck(domains, cell, num)) {
-
-                    // solving the next cell
-                    if (backtrack(board, domains, trail)) 
+                    if (backtrack(board, domains, trail))
                         return true;
                 }
 
-                board[cell.row][cell.col] = 0; // Undo the move
-                domains.clear(); // Restore the original domains
-                domains.putAll(backup); // Restore the domains to the previous state
+                board[cell.row][cell.col] = 0; // Undo
+                domains.clear();
+                domains.putAll(backup);
             }
         }
         return false;
     }
 
-
-    // forward checking: remove num from the domains of all affected cells (same row, col, box)
-    private boolean forwardCheck(Map<Cell, List<Integer>> domains, Cell current, int num) {
-        
-        // You don't need a domain list for a cell you've already filled.
+    private boolean forwardCheck(MyMap<Cell, MyList<Integer>> domains, Cell current, int num) {
         domains.remove(current);
 
         for (int i = 0; i < 9; i++) {
-            if (!eliminate(domains, new Cell(i, current.col), num)) 
+            if (!eliminate(domains, new Cell(i, current.col), num))
                 return false;
 
-            if (!eliminate(domains, new Cell(current.row, i), num)) 
+            if (!eliminate(domains, new Cell(current.row, i), num))
                 return false;
         }
 
@@ -104,70 +90,75 @@ public class RMIT_Sudoku_Solvers {
         int boxColStart = 3 * (current.col / 3);
         for (int r = 0; r < 3; r++)
             for (int c = 0; c < 3; c++)
-                if (!eliminate(domains, new Cell(boxRowStart + r, boxColStart + c), num)) 
+                if (!eliminate(domains, new Cell(boxRowStart + r, boxColStart + c), num))
                     return false;
 
         return true;
     }
 
-    private boolean eliminate(Map<Cell, List<Integer>> domains, Cell cell, int num) {
-        
-        // if still unassigned
+    private boolean eliminate(MyMap<Cell, MyList<Integer>> domains, Cell cell, int num) {
         if (domains.containsKey(cell)) {
-
-            //Get the current list of valid numbers for this cell
-            List<Integer> domain = domains.get(cell);
-            
-            //  Try to remove the number we just placed somewhere else (in a peer cell)
-            domain.remove(Integer.valueOf(num));
-            
-            if (domain.isEmpty()) 
+            MyList<Integer> domain = domains.get(cell);
+            domain.remove(num);
+            if (domain.size() == 0)
                 return false;
         }
         return true;
     }
 
-    private List<Integer> orderLCV(int[][] board, Cell cell, List<Integer> domain) {
-        Map<Integer, Integer> constraintCount = new HashMap<>();
-        for (int val : domain) {
+    private MyList<Integer> orderLCV(int[][] board, Cell cell, MyList<Integer> domain) {
+        MyMap<Integer, Integer> constraintCount = new MyMap<>();
+
+        for (int i = 0; i < domain.size(); i++) {
+            int val = domain.get(i);
             int count = 0;
-            for (int i = 0; i < 9; i++) {
-                if (board[i][cell.col] == 0 && getLegalValues(board, i, cell.col).contains(val)) 
+
+            for (int j = 0; j < 9; j++) {
+                if (board[j][cell.col] == 0 && getLegalValues(board, j, cell.col).contains(val))
                     count++;
-                if (board[cell.row][i] == 0 && getLegalValues(board, cell.row, i).contains(val)) 
+                if (board[cell.row][j] == 0 && getLegalValues(board, cell.row, j).contains(val))
                     count++;
             }
+
             int boxRowStart = 3 * (cell.row / 3);
             int boxColStart = 3 * (cell.col / 3);
             for (int r = 0; r < 3; r++)
                 for (int c = 0; c < 3; c++) {
                     int rr = boxRowStart + r;
                     int cc = boxColStart + c;
-                    if (board[rr][cc] == 0 && getLegalValues(board, rr, cc).contains(val)) 
+                    if (board[rr][cc] == 0 && getLegalValues(board, rr, cc).contains(val))
                         count++;
                 }
             constraintCount.put(val, count);
         }
-        List<Integer> sorted = new ArrayList<>(domain);
-        sorted.sort(Comparator.comparingInt(constraintCount::get));
+
+        MyList<Integer> sorted = new MyList<>();
+        for (int i = 0; i < domain.size(); i++) {
+            sorted.add(domain.get(i));
+        }
+
+        sorted.sort((a, b) -> constraintCount.get(a) - constraintCount.get(b));
         return sorted;
     }
 
-    private Cell selectMRV(Map<Cell, List<Integer>> domains) {
+    private Cell selectMRV(MyMap<Cell, MyList<Integer>> domains) {
         int min = 10;
         Cell best = null;
-        for (Map.Entry<Cell, List<Integer>> entry : domains.entrySet()) {
-            int size = entry.getValue().size();
+
+        MyList<MyEntry<Cell, MyList<Integer>>> entries = domains.entrySet();
+        for (int i = 0; i < entries.size(); i++) {
+            MyEntry<Cell, MyList<Integer>> entry = entries.get(i);
+            int size = entry.value.size();
             if (size < min) {
                 min = size;
-                best = entry.getKey();
+                best = entry.key;
             }
         }
         return best;
     }
 
-    private Map<Cell, List<Integer>> initializeDomains(int[][] board) {
-        Map<Cell, List<Integer>> domains = new HashMap<>();
+    private MyMap<Cell, MyList<Integer>> initializeDomains(int[][] board) {
+        MyMap<Cell, MyList<Integer>> domains = new MyMap<>();
         for (int r = 0; r < 9; r++)
             for (int c = 0; c < 9; c++)
                 if (board[r][c] == 0)
@@ -175,32 +166,44 @@ public class RMIT_Sudoku_Solvers {
         return domains;
     }
 
-    private Map<Cell, List<Integer>> deepCopy(Map<Cell, List<Integer>> original) {
-        Map<Cell, List<Integer>> copy = new HashMap<>();
-        for (Map.Entry<Cell, List<Integer>> entry : original.entrySet())
-            copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    private MyMap<Cell, MyList<Integer>> deepCopy(MyMap<Cell, MyList<Integer>> original) {
+        MyMap<Cell, MyList<Integer>> copy = new MyMap<>();
+        MyList<MyEntry<Cell, MyList<Integer>>> entries = original.entrySet();
+        for (int i = 0; i < entries.size(); i++) {
+            MyEntry<Cell, MyList<Integer>> entry = entries.get(i);
+            MyList<Integer> newList = new MyList<>();
+            for (int j = 0; j < entry.value.size(); j++) {
+                newList.add(entry.value.get(j));
+            }
+            copy.put(entry.key, newList);
+        }
         return copy;
     }
 
-    private List<Integer> getLegalValues(int[][] board, int row, int col) {
+    private MyList<Integer> getLegalValues(int[][] board, int row, int col) {
         boolean[] used = new boolean[10];
         for (int i = 0; i < 9; i++) {
             used[board[row][i]] = true;
             used[board[i][col]] = true;
             used[board[3 * (row / 3) + i / 3][3 * (col / 3) + i % 3]] = true;
         }
-        List<Integer> values = new ArrayList<>();
-        for (int i = 1; i <= 9; i++)
-            if (!used[i]) values.add(i);
+
+        MyList<Integer> values = new MyList<>();
+        for (int i = 1; i <= 9; i++) {
+            if (!used[i])
+                values.add(i);
+        }
         return values;
     }
 
     private boolean isValid(int[][] board, int row, int col, int num) {
         for (int i = 0; i < 9; i++) {
-            if (board[row][i] == num || board[i][col] == num) return false;
+            if (board[row][i] == num || board[i][col] == num)
+                return false;
             int boxRow = 3 * (row / 3) + i / 3;
             int boxCol = 3 * (col / 3) + i % 3;
-            if (board[boxRow][boxCol] == num) return false;
+            if (board[boxRow][boxCol] == num)
+                return false;
         }
         return true;
     }
