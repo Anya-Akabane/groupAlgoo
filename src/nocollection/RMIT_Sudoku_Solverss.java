@@ -1,7 +1,7 @@
 package nocollection;
 
 
-public class RMIT_Sudoku_Solver_NoCollections {
+public class RMIT_Sudoku_Solverss {
      static final int SIZE = 9;
     static int steps = 0;
  
